@@ -1,0 +1,52 @@
+name: 公众号健康热点 每日出稿推送
+
+# 云端定时自动化：每天北京时间 07:30 自动抓取热点 → 免费云端模型成文 → 推钉钉
+# 运行在 GitHub 服务器（ubuntu-latest），不依赖你电脑开机。
+on:
+  schedule:
+    # GitHub Actions 的 cron 使用 UTC 时间
+    # 北京时间 07:30 = UTC 23:30（前一天）
+    - cron: '30 23 * * *'
+  workflow_dispatch:  # 允许在 GitHub 网页上手动「Run workflow」触发
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # 密钥全部来自 GitHub Secrets（仓库 Settings → Secrets → Actions）
+    # 脚本本身读取 config.example.json，密钥通过环境变量覆盖，永不入库
+    env:
+      HOTBOT_MODEL_MODE: cloud
+      CLOUD_LLM_API_URL: https://api.siliconflow.cn/v1/chat/completions
+      CLOUD_LLM_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+      CLOUD_LLM_MODEL: ${{ secrets.SILICONFLOW_MODEL || 'Qwen/Qwen3-VL-8B-Instruct' }}
+      WECHAT_MODE: dingtalk
+      WECHAT_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+      WECHAT_SECRET: ${{ secrets.DINGTALK_SECRET }}
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 生成运行配置（用脱敏样例，密钥由环境变量注入）
+        run: cp config.example.json config.json
+
+      - name: 运行 hotbot（追踪 + 成文 + 推钉钉）
+        run: python3 hotbot.py
+
+      - name: 上传报告产物（钉钉正文会截断，完整版在此下载）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hotspot-report
+          path: output/*.txt
+          retention-days: 7

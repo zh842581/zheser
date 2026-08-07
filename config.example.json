@@ -1,0 +1,40 @@
+{
+  "model_mode": "cloud",
+  "source": "trendradar",
+  "llm_mock": false,
+  "tophub_key": "",
+  "system_prompt": "",
+  "gen_params": {
+    "temperature": 0.8,
+    "top_p": 1.0,
+    "top_k": 40,
+    "repetition_penalty": 1.05,
+    "presence_penalty": 0.0,
+    "min_p": 0.0,
+    "max_tokens": 2000
+  },
+  "local": {
+    "api_url": "http://127.0.0.1:1234/v1/chat/completions",
+    "model": "local-model"
+  },
+  "cloud": {
+    "api_url": "https://api.siliconflow.cn/v1/chat/completions",
+    "api_key": "",
+    "model": "Qwen/Qwen3-VL-8B-Instruct"
+  },
+  "wechat": {
+    "mode": "dingtalk",
+    "token": "",
+    "uids": "",
+    "webhook": "",
+    "secret": ""
+  },
+  "keywords": [
+    "不舒服", "乏力", "疲劳", "疲惫", "没劲", "浑身", "酸痛", "头晕", "头痛",
+    "颈椎", "腰酸", "背痛", "失眠", "睡眠", "亚健康",
+    "焦虑", "压力", "放松", "心情", "抑郁", "情绪", "紧张", "养心", "心理",
+    "健康", "养生", "体检", "免疫力", "三高", "血压", "血糖", "饮食",
+    "运动", "减肥", "冥想", "瑜伽", "调理", "泡脚", "气血",
+    "中年", "40岁", "50岁", "更年期", "退休", "老年"
+  ]
+}
