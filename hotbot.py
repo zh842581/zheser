@@ -13,6 +13,10 @@ hotbot.py —— 公众号"健康管理"热点追踪与自动成文
 
 文章验证：HOTBOT_LLM_MOCK=1 用模拟文章（用于无模型时验证流程）。
 
+外部简报（双管齐下）：设置 BRIEFING_FILE=路径，可将 TrendRadar 等简报
+（markdown 链接 [标题](url) 或纯文本每行一条）抽取的候选热点，合并进选题池，
+与自研采集合并后一起过关键词漏斗、一起成文。
+
 微信推送：由 wechat_push.py 负责，读取 config.json.wechat 或环境变量；
           未配置则跳过（不影响主流程）。
 
@@ -140,6 +144,36 @@ def _mock_items_by_platform():
     }
 
 
+# ----------------------------- 外部简报（双管齐下：吸收 TrendRadar 等简报） -----------------------------
+def load_briefing(path):
+    """从外部简报文件抽取候选热点，用于和自研采集合并。
+    支持：1) Markdown 链接 [标题](url)（TrendRadar 简报常用）；2) 纯文本每行一条标题。
+    返回 [{"title":..., "url":..., "heat":None}, ...]
+    """
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+    except Exception as e:
+        print(f"[简报] 读取失败：{e}")
+        return []
+    import re
+    items, seen = [], set()
+    for m in re.finditer(r"\[([^\]]+)\]\(([^)]+)\)", text):
+        title, url = m.group(1).strip(), m.group(2).strip()
+        if not title or title in seen:
+            continue
+        seen.add(title)
+        items.append({"title": title, "url": url, "heat": None})
+    if not items:  # 退化：按行抽取标题
+        for line in text.splitlines():
+            line = line.strip().lstrip("-*#").strip()
+            if line and len(line) >= 4 and line not in seen:
+                seen.add(line)
+                items.append({"title": line, "url": "", "heat": None})
+    print(f"[简报] 从 {path} 抽取 {len(items)} 条候选")
+    return items
+
+
 # ----------------------------- 关键词漏斗 -----------------------------
 def filter_related(items_by_platform):
     out = {}
@@ -211,6 +245,11 @@ def notify_wechat(title, content):
 def main():
     print(f"===== 开始（数据源={SOURCE}，模型={MODEL_MODE}{' 模拟' if LLM_MOCK else ''}）=====")
     all_items = get_items()
+    briefing_path = os.environ.get("BRIEFING_FILE")
+    if briefing_path and os.path.exists(briefing_path):
+        b_items = load_briefing(briefing_path)
+        if b_items:
+            all_items["简报补充"] = b_items
     total = sum(len(v) for v in all_items.values())
     print(f"=== 共抓到 {total} 条热榜 ===")
 
