@@ -18,3 +18,9 @@ jobs:
         run: python3 --version
       - name: 运行端点可达性诊断
         run: python3 .github/scripts/conn_test.py
+      - name: 上传诊断结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connectivity-result
+          path: connectivity-result.md

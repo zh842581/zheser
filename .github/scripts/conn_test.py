@@ -75,12 +75,16 @@ def main():
         "**结论**：若“采集源·国内平台”全部 ❌，说明美国服务器抓不到国内热榜，应改用本机定时或国内云；"
         "若 ✅，则 GitHub Actions 全自动方案可行。",
     ]
+    text = "\n".join(summary)
+    # 写文件供 artifact 下载（便于在沙箱取回结果）
+    with open("connectivity-result.md", "w", encoding="utf-8") as f:
+        f.write(text + "\n")
     p = os.environ.get("GITHUB_STEP_SUMMARY")
     if p:
         with open(p, "a", encoding="utf-8") as f:
-            f.write("\n".join(summary) + "\n")
+            f.write(text + "\n")
     else:
-        print("\n".join(summary))
+        print(text)
 
 
 if __name__ == "__main__":
