@@ -244,12 +244,17 @@ def notify_wechat(title, content):
 # ----------------------------- 主流程 -----------------------------
 def main():
     print(f"===== 开始（数据源={SOURCE}，模型={MODEL_MODE}{' 模拟' if LLM_MOCK else ''}）=====")
-    all_items = get_items()
     briefing_path = os.environ.get("BRIEFING_FILE")
+    b_items = []
     if briefing_path and os.path.exists(briefing_path):
         b_items = load_briefing(briefing_path)
-        if b_items:
-            all_items["简报补充"] = b_items
+    if b_items:
+        # 串接成文模式：优先用真正 TrendRadar 抓取的热点，不再重复自建抓取
+        all_items = {"TrendRadar": b_items}
+        print(f"===== 使用 TrendRadar 简报作为采集源（{len(b_items)} 条，已跳过自建抓取）=====")
+    else:
+        # 兜底：TrendRadar 无产出时回退自建采集
+        all_items = get_items()
     total = sum(len(v) for v in all_items.values())
     print(f"=== 共抓到 {total} 条热榜 ===")
 

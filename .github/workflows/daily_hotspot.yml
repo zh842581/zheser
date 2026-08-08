@@ -1,13 +1,12 @@
-name: 公众号健康热点 每日出稿推送
+name: 公众号健康热点 每日出稿推送（TrendRadar采集+hotbot成文）
 
-# 云端定时自动化：每天北京时间 07:30 自动抓取热点 → 免费云端模型成文 → 推钉钉
-# 运行在 GitHub 服务器（ubuntu-latest），不依赖你电脑开机。
+# 云端定时自动化：每天北京时间 07:30
+# 流程：克隆真正版 TrendRadar → 用健康关键词采集 → 转 briefing → hotbot 用云端模型写成公众号爆文 → 推钉钉
+# 若 TrendRadar 采集失败/无产出，hotbot 自动回退自建采集（兜底），保证每天有文章产出。
 on:
   schedule:
-    # GitHub Actions 的 cron 使用 UTC 时间
-    # 北京时间 07:30 = UTC 23:30（前一天）
-    - cron: '30 23 * * *'
-  workflow_dispatch:  # 允许在 GitHub 网页上手动「Run workflow」触发
+    - cron: '30 23 * * *'   # UTC 23:30 = 北京时间 07:30
+  workflow_dispatch:        # 允许在 GitHub 网页上手动「Run workflow」
 
 permissions:
   contents: read
@@ -15,10 +14,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
-    # 密钥全部来自 GitHub Secrets（仓库 Settings → Secrets → Actions）
-    # 脚本本身读取 config.example.json，密钥通过环境变量覆盖，永不入库
+    # 密钥全部来自 GitHub Secrets；脚本本身读取 config.example.json，密钥通过环境变量覆盖，永不入库
     env:
       HOTBOT_MODEL_MODE: cloud
       CLOUD_LLM_API_URL: https://api.siliconflow.cn/v1/chat/completions
@@ -29,24 +27,52 @@ jobs:
       WECHAT_SECRET: ${{ secrets.DINGTALK_SECRET }}
 
     steps:
-      - name: Checkout 代码
+      - name: Checkout 我们的代码（config/ + hotbot 脚本）
         uses: actions/checkout@v4
+
+      - name: 克隆真正版 TrendRadar 源码（sansan0/TrendRadar）
+        run: git clone --depth 1 https://github.com/sansan0/TrendRadar.git /tmp/TrendRadar
 
       - name: 准备 Python 环境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: 生成运行配置（用脱敏样例，密钥由环境变量注入）
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: 安装 TrendRadar 依赖
+        run: cd /tmp/TrendRadar && uv sync --no-dev
+
+      - name: 运行 TrendRadar 采集（用我们的健康关键词，关推送/关AI，纯采集）
+        run: |
+          cp "${{ github.workspace }}/config/config.yaml" /tmp/TrendRadar/config/config.yaml
+          cp "${{ github.workspace }}/config/frequency_words.txt" /tmp/TrendRadar/config/frequency_words.txt
+          cd /tmp/TrendRadar
+          timeout 540 uv run python -m trendradar || echo "⚠️ TrendRadar 运行异常/超时，hotbot 将回退自建采集"
+          cp -r output "${{ github.workspace }}/tr_output" 2>/dev/null || true
+
+      - name: 转换 TrendRadar 输出为 briefing（供 hotbot 消费）
+        run: python3 trendradar_to_briefing.py
+        env:
+          TR_OUTPUT_DIR: tr_output
+          BRIEFING_FILE: briefing.md
+
+      - name: 准备 hotbot 运行配置
         run: cp config.example.json config.json
 
-      - name: 运行 hotbot（追踪 + 成文 + 推钉钉）
+      - name: 运行 hotbot（TrendRadar 热点成文 + 推钉钉；无产出则回退自建）
         run: python3 hotbot.py
+        env:
+          BRIEFING_FILE: briefing.md
 
-      - name: 上传报告产物（钉钉正文会截断，完整版在此下载）
+      - name: 上传产物（报告 + briefing + TrendRadar 原始输出）
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hotspot-report
-          path: output/*.txt
+          path: |
+            output/*.txt
+            briefing.md
+            tr_output/**
           retention-days: 7
