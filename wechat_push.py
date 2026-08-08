@@ -82,6 +82,24 @@ def _post(url, payload, is_json=True):
         return r.read().decode("utf-8", "ignore")
 
 
+def _ok(resp):
+    """通用返回码校验：解析各平台返回的 JSON，errcode/code 非预期即视为失败。
+    无法解析（纯文本响应）时保守返回 True，保持原行为。"""
+    try:
+        d = json.loads(resp)
+    except Exception:
+        return True
+    if isinstance(d, dict):
+        if d.get("errcode", 0) != 0:
+            return False
+        code = d.get("code")
+        if code is not None and code not in (0, 200, 1000):
+            return False
+        if d.get("success") is False:
+            return False
+    return True
+
+
 def push_wechat(title, content, max_len=2000):
     """推送一条消息。成功返回 True，未配置/失败返回 False。"""
     mode, token, uids, webhook, secret = _conf()
@@ -158,7 +176,7 @@ def push_wechat(title, content, max_len=2000):
             return False
 
         print(f"[推送] {mode} 返回: {resp[:200]}")
-        return True
+        return _ok(resp)
     except Exception as e:
         print(f"[推送] 发送失败: {e}")
         return False
