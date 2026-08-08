@@ -5,3 +5,12 @@ config.json
 output/
 __pycache__/
 *.pyc
+
+# 工作记忆（含项目笔记/自动化，不外传）
+.workbuddy/
+
+# 运行时生成的临时/产物文件
+*.zip
+debug.log
+briefing.md
+tr_output/
